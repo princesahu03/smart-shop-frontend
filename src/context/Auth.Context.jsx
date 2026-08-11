@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext,
+  useState, useEffect } from 'react'
 import api from '../api/axios'
 
 const AuthContext = createContext()
@@ -13,10 +14,21 @@ export function AuthProvider({ children }) {
 
   const checkAuth = async () => {
     try {
+      // Token localStorage se lo:
+      const token = localStorage
+        .getItem('token')
+
+      if (token) {
+        api.defaults.headers.common[
+          'Authorization'
+        ] = `Bearer ${token}`
+      }
+
       const res = await api.get('/auth/me')
       setUser(res.data.data)
     } catch {
       setUser(null)
+      localStorage.removeItem('token')
     } finally {
       setLoading(false)
     }
@@ -26,12 +38,29 @@ export function AuthProvider({ children }) {
     const res = await api.post('/auth/login', {
       email, password
     })
+
+    // Token save karo:
+    const token = res.data.data.token
+    if (token) {
+      localStorage.setItem('token', token)
+      api.defaults.headers.common[
+        'Authorization'
+      ] = `Bearer ${token}`
+    }
+
     setUser(res.data.data.user)
     return res.data
   }
 
   const logout = async () => {
-    await api.post('/auth/logout')
+    try {
+      await api.post('/auth/logout')
+    } catch {}
+
+    localStorage.removeItem('token')
+    delete api.defaults.headers.common[
+      'Authorization'
+    ]
     setUser(null)
   }
 
@@ -44,7 +73,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, loading, 
+      user, loading,
       login, logout, register
     }}>
       {children}
@@ -52,4 +81,5 @@ export function AuthProvider({ children }) {
   )
 }
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () =>
+  useContext(AuthContext)
